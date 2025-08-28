@@ -14,6 +14,8 @@ const fileInput = ref(null)
 const currentFilter = ref('all')
 const currentProgress = ref(0)
 const totalNumbers = ref(0)
+const searchTerm = ref('')
+const sortOrder = ref('none') // 'none', 'asc', 'desc'
 
 // Computed properties
 const summary = computed(() => {
@@ -43,22 +45,49 @@ const summary = computed(() => {
 })
 
 const filteredResults = computed(() => {
-  if (currentFilter.value === 'all') {
-    return results.value
+  let filtered = results.value
+  
+  // Aplicar filtro por qualidade
+  if (currentFilter.value !== 'all') {
+    filtered = results.value.filter(result => {
+      if (currentFilter.value === 'bom') {
+        return result.status === 'SUCESSO' && result.qualidade_pt === 'BOM'
+      } else if (currentFilter.value === 'medio') {
+        return result.status === 'SUCESSO' && result.qualidade_pt === 'MÉDIO'
+      } else if (currentFilter.value === 'ruim') {
+        return result.status === 'SUCESSO' && result.qualidade_pt === 'RUIM'
+      } else if (currentFilter.value === 'erros') {
+        return result.status !== 'SUCESSO'
+      }
+      return true
+    })
   }
   
-  return results.value.filter(result => {
-    if (currentFilter.value === 'bom') {
-      return result.status === 'SUCESSO' && result.qualidade_pt === 'BOM'
-    } else if (currentFilter.value === 'medio') {
-      return result.status === 'SUCESSO' && result.qualidade_pt === 'MÉDIO'
-    } else if (currentFilter.value === 'ruim') {
-      return result.status === 'SUCESSO' && result.qualidade_pt === 'RUIM'
-    } else if (currentFilter.value === 'erros') {
-      return result.status !== 'SUCESSO'
-    }
-    return true
-  })
+  // Aplicar busca por nome
+  if (searchTerm.value.trim()) {
+    const searchLower = searchTerm.value.toLowerCase().trim()
+    filtered = filtered.filter(result => 
+      result.nome.toLowerCase().includes(searchLower) ||
+      result.numero.includes(searchTerm.value.trim())
+    )
+  }
+  
+  // Aplicar ordenação por qualidade
+  if (sortOrder.value !== 'none') {
+    filtered = [...filtered].sort((a, b) => {
+      const qualityOrder = { 'BOM': 3, 'MÉDIO': 2, 'RUIM': 1 }
+      const aQuality = qualityOrder[a.qualidade_pt] || 0
+      const bQuality = qualityOrder[b.qualidade_pt] || 0
+      
+      if (sortOrder.value === 'asc') {
+        return aQuality - bQuality
+      } else {
+        return bQuality - aQuality
+      }
+    })
+  }
+  
+  return filtered
 })
 
 const progressPercentage = computed(() => {
@@ -80,6 +109,23 @@ const getFilterDisplayName = () => {
     'erros': 'Com Erros'
   }
   return filterNames[currentFilter.value] || 'Geral'
+}
+
+const setSortOrder = (order) => {
+  sortOrder.value = order
+}
+
+const getSortDisplayName = () => {
+  const sortNames = {
+    'none': 'Sem Ordenação',
+    'asc': 'Menor Qualidade',
+    'desc': 'Maior Qualidade'
+  }
+  return sortNames[sortOrder.value] || 'Sem Ordenação'
+}
+
+const clearSearch = () => {
+  searchTerm.value = ''
 }
 
 const handleDrop = (e) => {
@@ -273,6 +319,8 @@ const analyzeFile = async () => {
   currentFilter.value = 'all'
   currentProgress.value = 0
   totalNumbers.value = 0
+  searchTerm.value = ''
+  sortOrder.value = 'none'
   
   try {
     const csvData = await readCSVFile(selectedFile.value)
@@ -471,11 +519,48 @@ const exportToExcel = () => {
             </button>
           </div>
 
+          <!-- Search and Sort Controls -->
+          <div class="controls-section">
+            <div class="search-container">
+              <div class="search-input-wrapper">
+                <input 
+                  type="text" 
+                  v-model="searchTerm"
+                  placeholder="Buscar por nome ou número..."
+                  class="search-input"
+                >
+                <button 
+                  v-if="searchTerm" 
+                  @click="clearSearch" 
+                  class="clear-search-btn"
+                  title="Limpar busca"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+            
+            <div class="sort-container">
+              <label for="sortSelect" class="sort-label">Ordenar por Qualidade:</label>
+              <select 
+                id="sortSelect" 
+                v-model="sortOrder" 
+                class="sort-select"
+              >
+                <option value="none">Sem Ordenação</option>
+                <option value="desc">Maior Qualidade</option>
+                <option value="asc">Menor Qualidade</option>
+              </select>
+            </div>
+          </div>
+
           <!-- Results Table -->
           <div class="results-table">
             <div class="table-header">
               <h3>Resultados {{ getFilterDisplayName() }}</h3>
               <p class="results-count">{{ filteredResults.length }} de {{ results.length }} números</p>
+              <p v-if="searchTerm" class="search-info">🔍 Buscando por: "{{ searchTerm }}"</p>
+              <p v-if="sortOrder !== 'none'" class="sort-info">📊 {{ getSortDisplayName() }}</p>
             </div>
             
             <table>
@@ -865,6 +950,96 @@ section h2 {
   font-weight: bold;
 }
 
+/* Search and Sort Controls */
+.controls-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  gap: 2rem;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 12px;
+  border: 1px solid #e9ecef;
+}
+
+.search-container {
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.3s ease;
+  background: white;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.clear-search-btn {
+  position: absolute;
+  right: 8px;
+  background: #dc3545;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.3s ease;
+}
+
+.clear-search-btn:hover {
+  background: #c82333;
+}
+
+.sort-container {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sort-label {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.sort-select {
+  padding: 10px 12px;
+  border: 2px solid #ddd;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.3s ease;
+}
+
+.sort-select:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
 /* Results Table */
 .table-header {
   display: flex;
@@ -872,16 +1047,34 @@ section h2 {
   align-items: center;
   margin-bottom: 2rem;
   padding: 0 1rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .table-header h3 {
   color: #2c3e50;
   font-size: 1.4rem;
+  margin: 0;
 }
 
 .results-count {
   color: #7f8c8d;
   font-size: 1rem;
+  margin: 0;
+}
+
+.search-info {
+  color: #28a745;
+  font-size: 0.9rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.sort-info {
+  color: #667eea;
+  font-size: 0.9rem;
+  margin: 0;
+  font-weight: 500;
 }
 
 .results-table {
@@ -1034,6 +1227,20 @@ th {
   
   .export-section {
     flex-direction: column;
+  }
+  
+  .controls-section {
+    flex-direction: column;
+    gap: 1rem;
+  }
+  
+  .search-container {
+    max-width: 100%;
+  }
+  
+  .sort-container {
+    width: 100%;
+    justify-content: space-between;
   }
   
   .table-header {
