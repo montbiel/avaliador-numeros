@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue'
 import Papa from 'papaparse'
 import axios from 'axios'
+import { BaseButton, BaseInput, BaseProgress, Card } from './components/argon'
 
 // Reactive data
 const selectedFile = ref(null)
@@ -406,24 +407,39 @@ const exportToExcel = () => {
                 accept=".csv"
                 class="file-input"
               >
-              <button @click="$refs.fileInput.click()" class="upload-btn">
+              <BaseButton 
+                @click="$refs.fileInput.click()" 
+                type="primary"
+                size="lg"
+                icon="ni ni-cloud-upload-96"
+              >
                 Selecionar Arquivo
-              </button>
+              </BaseButton>
             </div>
           </div>
           
           <div v-if="selectedFile" class="file-info">
             <p>📎 Arquivo selecionado: {{ selectedFile.name }}</p>
-            <button @click="analyzeFile" :disabled="isAnalyzing" class="analyze-btn">
+            <BaseButton 
+              @click="analyzeFile" 
+              :disabled="isAnalyzing" 
+              type="success"
+              size="lg"
+              icon="ni ni-chart-bar-32"
+            >
               {{ isAnalyzing ? '🔍 Analisando...' : '🔍 Analisar Números' }}
-            </button>
+            </BaseButton>
             
             <!-- Progress Bar -->
             <div v-if="isAnalyzing" class="progress-container">
-              <div class="progress-bar">
-                <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
-              </div>
-              <p class="progress-text">{{ currentProgress }} de {{ totalNumbers }} números analisados</p>
+              <BaseProgress 
+                :value="progressPercentage"
+                type="success"
+                :striped="true"
+                :animated="true"
+                :height="12"
+                :label="`${currentProgress} de ${totalNumbers} números analisados`"
+              />
             </div>
           </div>
         </div>
@@ -435,22 +451,28 @@ const exportToExcel = () => {
           <h2>⚙️ Configuração</h2>
           <div class="config-form">
             <div class="form-group">
-              <label for="accessToken">Access Token do Facebook:</label>
-              <input 
-                type="password" 
-                id="accessToken" 
+              <BaseInput
+                type="password"
+                id="accessToken"
                 v-model="accessToken"
+                label="Access Token do Facebook"
                 placeholder="Digite seu access token do Facebook"
-                class="form-input"
-              >
+                addonLeftIcon="ni ni-lock-circle-open"
+                required
+              />
             </div>
             <div class="form-group">
-              <label for="apiVersion">Versão da API:</label>
-              <select id="apiVersion" v-model="apiVersion" class="form-select">
+              <BaseInput
+                id="apiVersion"
+                v-model="apiVersion"
+                label="Versão da API"
+                addonLeftIcon="ni ni-settings-gear-65"
+                as="select"
+              >
                 <option value="v23.0">v23.0</option>
                 <option value="v24.0">v24.0</option>
                 <option value="v25.0">v25.0</option>
-              </select>
+              </BaseInput>
             </div>
           </div>
         </div>
@@ -463,94 +485,107 @@ const exportToExcel = () => {
           
           <!-- Summary Cards as Filters -->
           <div class="filter-cards">
-            <button 
+            <Card 
               @click="setFilter('all')" 
-              :class="['filter-card', { active: currentFilter === 'all' }]"
-              class="filter-card all">
+              :class="{ active: currentFilter === 'all' }"
+              type="secondary"
+              hover
+              shadow
+              class="filter-card"
+            >
               <div class="card-icon">📊</div>
               <div class="card-content">
                 <h3>Todos</h3>
                 <p class="card-number">{{ results.length }}</p>
               </div>
-            </button>
+            </Card>
             
-            <button 
+            <Card 
               @click="setFilter('bom')" 
-              :class="['filter-card', { active: currentFilter === 'bom' }]"
-              class="filter-card good">
+              :class="{ active: currentFilter === 'bom' }"
+              type="success"
+              hover
+              shadow
+              class="filter-card"
+            >
               <div class="card-icon">🟢</div>
               <div class="card-content">
                 <h3>Bons</h3>
                 <p class="card-number">{{ summary.bom }}</p>
               </div>
-            </button>
+            </Card>
             
-            <button 
+            <Card 
               @click="setFilter('medio')" 
-              :class="['filter-card', { active: currentFilter === 'medio' }]"
-              class="filter-card medium">
+              :class="{ active: currentFilter === 'medio' }"
+              type="warning"
+              hover
+              shadow
+              class="filter-card"
+            >
               <div class="card-icon">🟡</div>
               <div class="card-content">
                 <h3>Médios</h3>
                 <p class="card-number">{{ summary.medio }}</p>
               </div>
-            </button>
+            </Card>
             
-            <button 
+            <Card 
               @click="setFilter('ruim')" 
-              :class="['filter-card', { active: currentFilter === 'ruim' }]"
-              class="filter-card bad">
+              :class="{ active: currentFilter === 'ruim' }"
+              type="danger"
+              hover
+              shadow
+              class="filter-card"
+            >
               <div class="card-icon">🔴</div>
               <div class="card-content">
                 <h3>Ruins</h3>
                 <p class="card-number">{{ summary.ruim }}</p>
               </div>
-            </button>
+            </Card>
             
-            <button 
+            <Card 
               @click="setFilter('erros')" 
-              :class="['filter-card', { active: currentFilter === 'erros' }]"
-              class="filter-card error">
+              :class="{ active: currentFilter === 'erros' }"
+              type="dark"
+              hover
+              shadow
+              class="filter-card"
+            >
               <div class="card-icon">❌</div>
               <div class="card-content">
                 <h3>Erros</h3>
                 <p class="card-number">{{ summary.erros }}</p>
               </div>
-            </button>
+            </Card>
           </div>
 
           <!-- Search and Sort Controls -->
           <div class="controls-section">
             <div class="search-container">
-              <div class="search-input-wrapper">
-                <input 
-                  type="text" 
-                  v-model="searchTerm"
-                  placeholder="Buscar por nome ou número..."
-                  class="search-input"
-                >
-                <button 
-                  v-if="searchTerm" 
-                  @click="clearSearch" 
-                  class="clear-search-btn"
-                  title="Limpar busca"
-                >
-                  ✕
-                </button>
-              </div>
+              <BaseInput
+                type="text"
+                v-model="searchTerm"
+                placeholder="Buscar por nome ou número..."
+                addonLeftIcon="ni ni-zoom-split-in"
+                :addonRightIcon="searchTerm ? 'ni ni-fat-remove' : ''"
+                @click:addonRight="clearSearch"
+              />
             </div>
             
             <div class="sort-container">
-              <label for="sortSelect" class="sort-label">Ordenar por Qualidade:</label>
-              <select 
-                id="sortSelect" 
-                v-model="sortOrder" 
-                class="sort-select"
+              <BaseInput
+                id="sortSelect"
+                v-model="sortOrder"
+                label="Ordenar por Qualidade"
+                addonLeftIcon="ni ni-chart-bar-32"
+                as="select"
               >
                 <option value="none">Sem Ordenação</option>
                 <option value="desc">Maior Qualidade</option>
                 <option value="asc">Menor Qualidade</option>
-              </select>
+              </BaseInput>
             </div>
           </div>
 
@@ -596,12 +631,20 @@ const exportToExcel = () => {
 
           <!-- Export Buttons -->
           <div class="export-section">
-            <button @click="exportToCSV" class="export-btn">
-              📄 Exportar CSV
-            </button>
-            <button @click="exportToExcel" class="export-btn">
-              📊 Exportar Excel
-            </button>
+            <BaseButton 
+              @click="exportToCSV" 
+              type="info"
+              icon="ni ni-single-copy-04"
+            >
+              Exportar CSV
+            </BaseButton>
+            <BaseButton 
+              @click="exportToExcel" 
+              type="warning"
+              icon="ni ni-chart-pie-35"
+            >
+              Exportar Excel
+            </BaseButton>
           </div>
         </div>
       </section>
@@ -739,45 +782,7 @@ section h2 {
   display: none;
 }
 
-.upload-btn {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  padding: 15px 30px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
 
-.analyze-btn {
-  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-  color: white;
-  border: none;
-  padding: 15px 30px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.upload-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.4);
-}
-
-.analyze-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
-}
-
-.analyze-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-  transform: none;
-}
 
 .file-info {
   text-align: center;
@@ -798,47 +803,6 @@ section h2 {
   background: #f8f9fa;
   border-radius: 10px;
   border: 1px solid #e9ecef;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 12px;
-  background: #e9ecef;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 0.75rem;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #28a745, #20c997);
-  border-radius: 6px;
-  transition: width 0.3s ease;
-  position: relative;
-}
-
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-  animation: shimmer 2s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-.progress-text {
-  text-align: center;
-  font-size: 0.9rem;
-  color: #6c757d;
-  font-weight: 500;
-  margin: 0;
 }
 
 /* Configuration Section */
@@ -862,21 +826,7 @@ section h2 {
   font-size: 1.1rem;
 }
 
-.form-input,
-.form-select {
-  padding: 15px;
-  border: 2px solid #ddd;
-  border-radius: 10px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
-}
 
-.form-input:focus,
-.form-select:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
 
 /* Filter Cards */
 .filter-cards {
@@ -890,48 +840,21 @@ section h2 {
 }
 
 .filter-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1.5rem;
-  border-radius: 12px;
-  color: white;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-  border: none;
-  cursor: pointer;
-  transition: all 0.3s ease;
+  text-align: center;
   min-height: 100px;
 }
 
 .filter-card:hover {
   transform: translateY(-3px);
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
 }
 
 .filter-card.active {
-  transform: translateY(-3px);
-  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.3);
-  border: 3px solid white;
-}
-
-.filter-card.all {
-  background: linear-gradient(135deg, #6c757d, #495057);
-}
-
-.filter-card.good {
-  background: linear-gradient(135deg, #4CAF50, #45a049);
-}
-
-.filter-card.medium {
-  background: linear-gradient(135deg, #FF9800, #F57C00);
-}
-
-.filter-card.bad {
-  background: linear-gradient(135deg, #F44336, #D32F2F);
-}
-
-.filter-card.error {
-  background: linear-gradient(135deg, #9E9E9E, #757575);
+  transform: scale(1.05);
 }
 
 .card-icon {
@@ -968,76 +891,8 @@ section h2 {
   max-width: 400px;
 }
 
-.search-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.search-input {
-  width: 100%;
-  padding: 12px 40px 12px 16px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
-  transition: border-color 0.3s ease;
-  background: white;
-}
-
-.search-input:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.clear-search-btn {
-  position: absolute;
-  right: 8px;
-  background: #dc3545;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  font-size: 12px;
-  transition: background-color 0.3s ease;
-}
-
-.clear-search-btn:hover {
-  background: #c82333;
-}
-
 .sort-container {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.sort-label {
-  font-weight: 600;
-  color: #2c3e50;
-  font-size: 0.9rem;
-  white-space: nowrap;
-}
-
-.sort-select {
-  padding: 10px 12px;
-  border: 2px solid #ddd;
-  border-radius: 8px;
-  font-size: 0.9rem;
-  background: white;
-  cursor: pointer;
-  transition: border-color 0.3s ease;
-}
-
-.sort-select:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  min-width: 250px;
 }
 
 /* Results Table */
@@ -1157,23 +1012,6 @@ th {
   display: flex;
   gap: 1.5rem;
   justify-content: center;
-}
-
-.export-btn {
-  background: linear-gradient(135deg, #28a745, #20c997);
-  color: white;
-  border: none;
-  padding: 15px 30px;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 1.1rem;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.export-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(40, 167, 69, 0.4);
 }
 
 
