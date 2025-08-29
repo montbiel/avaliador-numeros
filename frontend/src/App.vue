@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, nextTick } from 'vue'
 import Papa from 'papaparse'
 import axios from 'axios'
 import { BaseButton, BaseInput, BaseProgress, Card } from './components/argon'
@@ -129,20 +129,69 @@ const clearSearch = () => {
   searchTerm.value = ''
 }
 
+const triggerFileInput = async () => {
+  console.log('Triggering file input...')
+  
+  // Método 1: Usar a referência Vue
+  if (fileInput.value) {
+    console.log('File input found via ref, clicking...')
+    fileInput.value.click()
+    return
+  }
+  
+  // Método 2: Usar nextTick e tentar novamente
+  await nextTick()
+  if (fileInput.value) {
+    console.log('File input found after nextTick, clicking...')
+    fileInput.value.click()
+    return
+  }
+  
+  // Método 3: Fallback - buscar por ID
+  const inputElement = document.getElementById('fileInput')
+  if (inputElement) {
+    console.log('Found input by ID, clicking...')
+    inputElement.click()
+    return
+  }
+  
+  // Método 4: Fallback - buscar por querySelector
+  const inputByQuery = document.querySelector('input[type="file"]')
+  if (inputByQuery) {
+    console.log('Found input by querySelector, clicking...')
+    inputByQuery.click()
+    return
+  }
+  
+  console.log('No file input found by any method')
+  alert('Erro: Não foi possível abrir o seletor de arquivos. Tente arrastar e soltar o arquivo.')
+}
+
 const handleDrop = (e) => {
   e.preventDefault()
   isDragOver.value = false
   
   const files = e.dataTransfer.files
   if (files.length > 0) {
-    selectedFile.value = files[0]
+    const file = files[0]
+    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      selectedFile.value = file
+    } else {
+      alert('Por favor, selecione apenas arquivos CSV')
+    }
   }
 }
 
 const handleFileSelect = (e) => {
   const files = e.target.files
   if (files.length > 0) {
-    selectedFile.value = files[0]
+    const file = files[0]
+    if (file.type === 'text/csv' || file.name.endsWith('.csv')) {
+      selectedFile.value = file
+    } else {
+      alert('Por favor, selecione apenas arquivos CSV')
+      e.target.value = '' // Limpa o input
+    }
   }
 }
 
@@ -257,21 +306,21 @@ const analyzeNumbers = async (csvData) => {
   const resultsData = []
   const validNumbers = csvData.filter(row => {
     const codTelefone = row['Cod Telefone'] || row['cod_telefone'] || ''
-    return codTelefone
+    return codTelefone && codTelefone.trim() !== ''
   })
   
   totalNumbers.value = validNumbers.length
   currentProgress.value = 0
   
-  for (let i = 0; i < csvData.length; i++) {
-    const row = csvData[i]
+  console.log(`Total de números válidos para análise: ${validNumbers.length}`)
+  
+  for (let i = 0; i < validNumbers.length; i++) {
+    const row = validNumbers[i]
     const nome = row['Nome'] || row['nome'] || ''
     const numero = row['Número'] || row['numero'] || ''
     const codTelefone = row['Cod Telefone'] || row['cod_telefone'] || ''
     
-    if (!codTelefone) continue
-    
-    console.log(`Analisando ${i + 1}/${csvData.length}: ${nome}`)
+    console.log(`Analisando ${i + 1}/${validNumbers.length}: ${nome} (${codTelefone})`)
     
     try {
       const result = await verifyNumberQuality(codTelefone)
@@ -282,7 +331,7 @@ const analyzeNumbers = async (csvData) => {
         ...result
       })
       
-      currentProgress.value++
+      currentProgress.value = i + 1
       
       // Pequena pausa para não sobrecarregar a API
       await new Promise(resolve => setTimeout(resolve, 1000))
@@ -297,11 +346,12 @@ const analyzeNumbers = async (csvData) => {
         dados: null
       })
       
-      currentProgress.value++
+      currentProgress.value = i + 1
     }
   }
   
   results.value = resultsData
+  console.log('Análise concluída!')
 }
 
 const analyzeFile = async () => {
@@ -395,6 +445,9 @@ const exportToExcel = () => {
                @drop="handleDrop" 
                @dragover.prevent 
                @dragenter.prevent
+               @dragleave.prevent
+               @dragenter="isDragOver = true"
+               @dragleave="isDragOver = false"
                :class="{ 'drag-over': isDragOver }">
             <div class="upload-content">
               <div class="upload-icon">📄</div>
@@ -403,23 +456,26 @@ const exportToExcel = () => {
               <input 
                 type="file" 
                 ref="fileInput" 
+                id="fileInput"
                 @change="handleFileSelect" 
                 accept=".csv"
                 class="file-input"
+                style="display: none;"
               >
-              <BaseButton 
-                @click="$refs.fileInput.click()" 
-                type="primary"
-                size="lg"
-                icon="ni ni-cloud-upload-96"
+              <button 
+                @click="triggerFileInput" 
+                type="button"
+                class="btn btn-primary btn-lg"
               >
-                Selecionar Arquivo
-              </BaseButton>
+                📁 Selecionar Arquivo
+              </button>
+              <p class="upload-hint">Clique no botão acima para selecionar um arquivo CSV</p>
             </div>
           </div>
           
           <div v-if="selectedFile" class="file-info">
-            <p>📎 Arquivo selecionado: {{ selectedFile.name }}</p>
+            <p>📎 Arquivo selecionado: <strong>{{ selectedFile.name }}</strong></p>
+            <p class="file-size">Tamanho: {{ (selectedFile.size / 1024).toFixed(2) }} KB</p>
             <BaseButton 
               @click="analyzeFile" 
               :disabled="isAnalyzing" 
@@ -451,28 +507,30 @@ const exportToExcel = () => {
           <h2>⚙️ Configuração</h2>
           <div class="config-form">
             <div class="form-group">
-              <BaseInput
+              <label for="accessToken">Access Token do Facebook</label>
+              <input
                 type="password"
                 id="accessToken"
                 v-model="accessToken"
-                label="Access Token do Facebook"
                 placeholder="Digite seu access token do Facebook"
-                addonLeftIcon="ni ni-lock-circle-open"
+                class="form-control"
                 required
               />
             </div>
             <div class="form-group">
-              <BaseInput
+              <label for="apiVersion">Versão da API</label>
+              <select
                 id="apiVersion"
                 v-model="apiVersion"
-                label="Versão da API"
-                addonLeftIcon="ni ni-settings-gear-65"
-                as="select"
+                class="form-control"
               >
                 <option value="v23.0">v23.0</option>
                 <option value="v24.0">v24.0</option>
                 <option value="v25.0">v25.0</option>
-              </BaseInput>
+                <option value="v26.0">v26.0</option>
+                <option value="v27.0">v27.0</option>
+                <option value="v28.0">v28.0</option>
+              </select>
             </div>
           </div>
         </div>
@@ -564,28 +622,38 @@ const exportToExcel = () => {
           <!-- Search and Sort Controls -->
           <div class="controls-section">
             <div class="search-container">
-              <BaseInput
-                type="text"
-                v-model="searchTerm"
-                placeholder="Buscar por nome ou número..."
-                addonLeftIcon="ni ni-zoom-split-in"
-                :addonRightIcon="searchTerm ? 'ni ni-fat-remove' : ''"
-                @click:addonRight="clearSearch"
-              />
+              <label for="searchInput">Buscar</label>
+              <div class="search-input-wrapper">
+                <input
+                  type="text"
+                  id="searchInput"
+                  v-model="searchTerm"
+                  placeholder="Buscar por nome ou número..."
+                  class="form-control search-input"
+                />
+                <button 
+                  v-if="searchTerm" 
+                  @click="clearSearch"
+                  type="button"
+                  class="search-clear-btn"
+                  title="Limpar busca"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
             
             <div class="sort-container">
-              <BaseInput
+              <label for="sortSelect">Ordenar por Qualidade</label>
+              <select
                 id="sortSelect"
                 v-model="sortOrder"
-                label="Ordenar por Qualidade"
-                addonLeftIcon="ni ni-chart-bar-32"
-                as="select"
+                class="form-control"
               >
                 <option value="none">Sem Ordenação</option>
                 <option value="desc">Maior Qualidade</option>
                 <option value="asc">Menor Qualidade</option>
-              </BaseInput>
+              </select>
             </div>
           </div>
 
@@ -760,6 +828,8 @@ section h2 {
 .upload-area.drag-over {
   border-color: #667eea;
   background: #f8f9ff;
+  transform: scale(1.02);
+  box-shadow: 0 8px 25px rgba(102, 126, 234, 0.2);
 }
 
 .upload-content {
@@ -778,6 +848,12 @@ section h2 {
   color: #666;
 }
 
+.upload-hint {
+  font-size: 0.9rem !important;
+  color: #6c757d !important;
+  margin-top: 0.5rem;
+}
+
 .file-input {
   display: none;
 }
@@ -794,6 +870,12 @@ section h2 {
 .file-info p {
   font-size: 1.1rem;
   margin-bottom: 1rem;
+}
+
+.file-size {
+  color: #6c757d;
+  font-size: 0.9rem !important;
+  margin-bottom: 1.5rem !important;
 }
 
 /* Progress Bar */
@@ -824,6 +906,39 @@ section h2 {
   font-weight: 600;
   color: #2c3e50;
   font-size: 1.1rem;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.form-control {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: all 0.3s ease;
+  background: white;
+  color: #495057;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-control::placeholder {
+  color: #6c757d;
+}
+
+select.form-control {
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
+  background-position: right 12px center;
+  background-repeat: no-repeat;
+  background-size: 16px;
+  padding-right: 40px;
+  appearance: none;
 }
 
 
@@ -1012,6 +1127,72 @@ th {
   display: flex;
   gap: 1.5rem;
   justify-content: center;
+}
+
+/* Search Input Styles */
+.search-input-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding-right: 40px;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #6c757d;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.search-clear-btn:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+/* Custom Button Styles */
+.btn {
+  display: inline-block;
+  font-weight: 400;
+  text-align: center;
+  vertical-align: middle;
+  user-select: none;
+  border: 1px solid transparent;
+  padding: 0.375rem 0.75rem;
+  font-size: 1rem;
+  line-height: 1.5;
+  border-radius: 0.25rem;
+  transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.btn-primary {
+  color: #fff;
+  background-color: #667eea;
+  border-color: #667eea;
+}
+
+.btn-primary:hover {
+  color: #fff;
+  background-color: #5a6fd8;
+  border-color: #5a6fd8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.btn-lg {
+  padding: 0.75rem 1.5rem;
+  font-size: 1.25rem;
+  border-radius: 0.5rem;
 }
 
 
